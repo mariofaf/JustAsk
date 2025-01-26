@@ -64,6 +64,12 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
         }
 
+        #spinner {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -89,15 +95,40 @@
         canvas {
             margin-top: 20px;
         }
+
+        #chart-type-selector {
+            margin: 10px 0;
+            text-align: center;
+        }
+
+        #chart-type-selector select {
+            font-size: 16px;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
     </style>
 </head>
 
 <body>
-    <h1>Product Management - Demo Zone </h1>
+    <h1>Product Management - Pampered Chef</h1>
     <form id="query-form">
         <input type="text" id="query" placeholder="Enter your business question" required />
         <button type="submit">Ask</button>
     </form>
+
+    <div id="chart-type-selector">
+        <label for="chartType">Select Chart Type: </label>
+        <select id="chartType">
+            <option value="bar">Bar</option>
+            <option value="line">Line</option>
+            <option value="pie">Pie</option>
+        </select>
+    </div>
+
+    <div id="spinner">
+        <p>Loading...</p>
+    </div>
 
     <div id="results">
         <h2>Results</h2>
@@ -109,141 +140,133 @@
         </table>
         <canvas id="results-chart" width="400" height="200"></canvas>
     </div>
-</body>
-<script>
-    document.getElementById("query-form").addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const query = document.getElementById("query").value;
 
+    <script>
+        document.getElementById("query-form").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const query = document.getElementById("query").value;
+            const spinner = document.getElementById("spinner");
+            spinner.style.display = "block";
 
-        // URL del webhook de N8N
-        const webhookUrl = "https://aipufy.app.n8n.cloud/webhook/a804b19f-c060-4a15-a121-a48f41e32e94";//produccion
-        //const webhookUrl = "https://aipufy.app.n8n.cloud/webhook-test/a804b19f-c060-4a15-a121-a48f41e32e94";// Testing
-
-        try {
-            const response = await fetch(webhookUrl, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ question: query }),
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! Status: ${response.status}`);
-            }
-
-            const data = await response.json(); // Procesa el JSON completo
-            console.log("Response JSON:", data); // Imprime el JSON recibido
-            displayResults(data.results || data); // Usa data.results si existe, o data directamente
-        } catch (error) {
-            console.error("Error while processing the query:", error);
-            alert(`An error occurred: ${error.message}`);
-        }
-
-    });
-
-    async function fetchWithTimeout(resource, options = {}, timeout = 50000) {
-        const controller = new AbortController();
-        const id = setTimeout(() => controller.abort(), timeout);
-        options.signal = controller.signal;
-
-        try {
-            const response = await fetch(resource, options);
-            clearTimeout(id); // Limpia el timeout si la solicitud fue exitosa
-            return response;
-        } catch (error) {
-            console.error("Request timed out or failed:", error);
-            throw error; // Propaga el error
-        }
-    }
-
-    function displayResults(results) {
-        const tableHead = document.querySelector("#results-table thead tr");
-        const tableBody = document.querySelector("#results-table tbody");
-        const chartCanvas = document.getElementById("results-chart");
-
-        const labels = [];  // Etiquetas para el gráfico
-        const values = [];  // Valores para el gráfico
-
-        // Limpia la tabla y el gráfico previo
-        tableHead.innerHTML = "";
-        tableBody.innerHTML = "";
-
-        if (results.length > 0) {
-            // Crear encabezados de la tabla
-            Object.keys(results[0]).forEach(key => {
-                const th = document.createElement("th");
-                th.textContent = key;
-                tableHead.appendChild(th);
-            });
-
-            // Rellenar las filas de la tabla
-            results.forEach(row => {
-                const tr = document.createElement("tr");
-                Object.values(row).forEach(value => {
-                    const td = document.createElement("td");
-                    td.textContent = value;
-                    tr.appendChild(td);
+            const webhookUrl = "https://aipufy.app.n8n.cloud/webhook/a804b19f-c060-4a15-a121-a48f41e32e94";//Production
+            //const webhookUrl = "https://aipufy.app.n8n.cloud/webhook-test/a804b19f-c060-4a15-a121-a48f41e32e94";//Testing
+            try {
+                const response = await fetch(webhookUrl, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ question: query }),
                 });
-                tableBody.appendChild(tr);
 
-                // Agregar datos al gráfico
-                labels.push(row.region || row.product_name); // Ajusta según tus datos
-                values.push(Number(row.total_sales)); // Convierte a número
-            });
-
-            console.log("Labels:", labels);
-            console.log("Values:", values);
-
-            // Generar el gráfico
-            renderChart(chartCanvas, labels, values);
-        } else {
-            const tr = document.createElement("tr");
-            const td = document.createElement("td");
-            td.textContent = "No data available.";
-            td.colSpan = 5; // Ajusta según el número de columnas
-            tr.appendChild(td);
-            tableBody.appendChild(tr);
-        }
-    }
-
-
-    function renderChart(canvas, labels, values) {
-        // Limpia el canvas si ya había un gráfico
-        if (canvas.chartInstance) {
-            canvas.chartInstance.destroy(); // Elimina el gráfico existente
-        }
-
-        // Crear el gráfico
-        canvas.chartInstance = new Chart(canvas, {
-            type: 'bar', // Cambia a 'line', 'pie', etc. según el tipo de gráfico
-            data: {
-                labels: labels, // Etiquetas del eje X
-                datasets: [{
-                    label: 'Total Sales',
-                    data: values, // Valores del eje Y
-                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
                 }
+
+                const data = await response.json();
+                displayResults(data.results || data);
+            } catch (error) {
+                console.error("Error while processing the query:", error);
+                alert(`An error occurred: ${error.message}`);
+            } finally {
+                spinner.style.display = "none";
             }
         });
-    }
 
-</script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        function displayResults(results) {
+            const tableHead = document.querySelector("#results-table thead tr");
+            const tableBody = document.querySelector("#results-table tbody");
+            const chartCanvas = document.getElementById("results-chart");
+            const chartType = document.getElementById("chartType").value;
+
+            const labels = [];
+            const values = [];
+
+            // Limpia la tabla y el gráfico previo
+            tableHead.innerHTML = "";
+            tableBody.innerHTML = "";
+
+            // Verificar si los resultados son un array
+            if (!Array.isArray(results)) {
+                console.error("Expected an array but got:", results);
+                alert("Error: Data format is invalid.");
+                return;
+            }
+
+            if (results.length > 0) {
+                // Crear encabezados de la tabla
+                Object.keys(results[0]).forEach(key => {
+                    const th = document.createElement("th");
+                    th.textContent = key.replace("_", " ").toUpperCase();
+                    tableHead.appendChild(th);
+                });
+
+                // Rellenar las filas de la tabla
+                results.forEach(row => {
+                    const tr = document.createElement("tr");
+                    Object.keys(row).forEach(key => {
+                        const td = document.createElement("td");
+                        td.textContent = row[key] || "N/A";
+                        tr.appendChild(td);
+                    });
+                    tableBody.appendChild(tr);
+
+                    // Agregar datos al gráfico
+                    labels.push(row.region_name || "Unknown");
+                    values.push(Number(row.total_sales) || 0);
+                });
+
+                // Generar el gráfico
+                renderChart(chartCanvas, labels, values, chartType);
+            } else {
+                const tr = document.createElement("tr");
+                const td = document.createElement("td");
+                td.textContent = "No data available.";
+                td.colSpan = 5;
+                tr.appendChild(td);
+                tableBody.appendChild(tr);
+            }
+        }
+
+        function renderChart(canvas, labels, values, type) {
+            // Limpia el canvas si ya había un gráfico
+            if (canvas.chartInstance) {
+                canvas.chartInstance.destroy();
+            }
+
+            // Crear el gráfico
+            canvas.chartInstance = new Chart(canvas, {
+                type: type,
+                data: {
+                    labels: labels, // Etiquetas del eje X
+                    datasets: [{
+                        label: 'Total Sales',
+                        data: values, // Valores del eje Y
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: `Sales by Region`
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+    </script>
+</body>
 
 </html>
