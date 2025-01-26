@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BI Web App</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f9f9f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 2rem;
+            color: #0056b3;
+        }
+
+        form {
+            display: flex;
+            justify-content: center;
+            margin: 20px;
+        }
+
+        #query {
+            width: 400px;
+            height: 40px;
+            font-size: 16px;
+            padding: 5px 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            height: 40px;
+            font-size: 16px;
+            margin-left: 10px;
+            padding: 0 15px;
+            border: none;
+            border-radius: 5px;
+            background-color: #0056b3;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #004494;
+        }
+
+        #results {
+            margin: 20px auto;
+            max-width: 800px;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f4f4f4;
+            font-weight: bold;
+        }
+
+        td {
+            background-color: #fff;
+        }
+
+        canvas {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Product Management - Pampered Chef </h1>
+    <form id="query-form">
+        <input type="text" id="query" placeholder="Enter your business question" required />
+        <button type="submit">Ask</button>
+    </form>
+
+    <div id="results">
+        <h2>Results</h2>
+        <table id="results-table">
+            <thead>
+                <tr></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <canvas id="results-chart" width="400" height="200"></canvas>
+    </div>
+</body>
+<script>
+    document.getElementById("query-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const query = document.getElementById("query").value;
+
+
+        // URL del webhook de N8N
+        const webhookUrl = "https://aipufy.app.n8n.cloud/webhook/a804b19f-c060-4a15-a121-a48f41e32e94";//produccion
+        //const webhookUrl = "https://aipufy.app.n8n.cloud/webhook-test/a804b19f-c060-4a15-a121-a48f41e32e94";// Testing
+
+        try {
+            const response = await fetch(webhookUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ question: query }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json(); // Procesa el JSON completo
+            console.log("Response JSON:", data); // Imprime el JSON recibido
+            displayResults(data.results || data); // Usa data.results si existe, o data directamente
+        } catch (error) {
+            console.error("Error while processing the query:", error);
+            alert(`An error occurred: ${error.message}`);
+        }
+
+    });
+
+    async function fetchWithTimeout(resource, options = {}, timeout = 50000) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        options.signal = controller.signal;
+
+        try {
+            const response = await fetch(resource, options);
+            clearTimeout(id); // Limpia el timeout si la solicitud fue exitosa
+            return response;
+        } catch (error) {
+            console.error("Request timed out or failed:", error);
+            throw error; // Propaga el error
+        }
+    }
+
+    function displayResults(results) {
+        const tableHead = document.querySelector("#results-table thead tr");
+        const tableBody = document.querySelector("#results-table tbody");
+        const chartCanvas = document.getElementById("results-chart");
+
+        const labels = [];  // Etiquetas para el gráfico
+        const values = [];  // Valores para el gráfico
+
+        // Limpia la tabla y el gráfico previo
+        tableHead.innerHTML = "";
+        tableBody.innerHTML = "";
+
+        if (results.length > 0) {
+            // Crear encabezados de la tabla
+            Object.keys(results[0]).forEach(key => {
+                const th = document.createElement("th");
+                th.textContent = key;
+                tableHead.appendChild(th);
+            });
+
+            // Rellenar las filas de la tabla
+            results.forEach(row => {
+                const tr = document.createElement("tr");
+                Object.values(row).forEach(value => {
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+
+                // Agregar datos al gráfico
+                labels.push(row.region || row.product_name); // Ajusta según tus datos
+                values.push(Number(row.total_sales)); // Convierte a número
+            });
+
+            console.log("Labels:", labels);
+            console.log("Values:", values);
+
+            // Generar el gráfico
+            renderChart(chartCanvas, labels, values);
+        } else {
+            const tr = document.createElement("tr");
+            const td = document.createElement("td");
+            td.textContent = "No data available.";
+            td.colSpan = 5; // Ajusta según el número de columnas
+            tr.appendChild(td);
+            tableBody.appendChild(tr);
+        }
+    }
+
+
+    function renderChart(canvas, labels, values) {
+        // Limpia el canvas si ya había un gráfico
+        if (canvas.chartInstance) {
+            canvas.chartInstance.destroy(); // Elimina el gráfico existente
+        }
+
+        // Crear el gráfico
+        canvas.chartInstance = new Chart(canvas, {
+            type: 'bar', // Cambia a 'line', 'pie', etc. según el tipo de gráfico
+            data: {
+                labels: labels, // Etiquetas del eje X
+                datasets: [{
+                    label: 'Total Sales',
+                    data: values, // Valores del eje Y
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</html>
