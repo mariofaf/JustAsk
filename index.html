@@ -148,8 +148,8 @@
             const spinner = document.getElementById("spinner");
             spinner.style.display = "block";
 
-            const webhookUrl = "https://aipufy.app.n8n.cloud/webhook/a804b19f-c060-4a15-a121-a48f41e32e94";//Production
-            //const webhookUrl = "https://aipufy.app.n8n.cloud/webhook-test/a804b19f-c060-4a15-a121-a48f41e32e94";//Testing
+            //const webhookUrl = "https://aipufy.app.n8n.cloud/webhook/a804b19f-c060-4a15-a121-a48f41e32e94";//Production
+            const webhookUrl = "https://aipufy.app.n8n.cloud/webhook-test/a804b19f-c060-4a15-a121-a48f41e32e94";//Testing
             try {
                 const response = await fetch(webhookUrl, {
                     method: "POST",
